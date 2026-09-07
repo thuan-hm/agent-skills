@@ -1,0 +1,6 @@
+# Machine-local skill overrides: internal project IDs, paths, dataset names.
+# Committed skills stay generic; specifics live here and never leave the machine.
+**/LOCAL.md
+
+.DS_Store
+node_modules/

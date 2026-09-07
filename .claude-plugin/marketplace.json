@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "agent-skills",
+  "description": "Personal Claude Code skills for data, AI, and backend work.",
+  "owner": {
+    "name": "thuan-hm",
+    "url": "https://github.com/thuan-hm"
+  },
+  "plugins": [
+    {
+      "name": "agent-skills",
+      "description": "Skills across data, AI, and backend work — and for writing skills themselves.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
