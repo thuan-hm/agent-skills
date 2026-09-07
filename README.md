@@ -18,7 +18,7 @@ Send the two commands as separate prompts.
 
 | Skill | Domain | Use it to |
 | --- | --- | --- |
-| _none yet_ | | |
+| [python-style](skills/python-style/SKILL.md) | python | structure and review Python for data, AI, and backend work |
 
 Skills stay flat in `skills/`, one directory each, regardless of domain — the
 plugin loader looks for `skills/<name>/SKILL.md`, so grouping happens in this

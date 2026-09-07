@@ -1,0 +1,51 @@
+# Drop into a new repo root. Single source of truth for tooling config.
+# Install and run with uv:
+#   uv sync
+#   uv run ruff format . && uv run ruff check --fix .
+
+[project]
+name = "change-me"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = ["ruff>=0.6", "pytest>=8.0"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["notebooks", "*.ipynb"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes — undefined names, unused imports
+  "I",        # isort — import ordering
+  "UP",       # pyupgrade — enforces list[dict] over List[Dict]
+  "B",        # bugbear — mutable default args, broad except
+  "SIM",      # simplify
+  "T20",      # flake8-print — bans print(), use logging
+  "RET",      # return consistency
+  "ARG",      # unused arguments
+  "PTH",      # prefer pathlib over os.path
+  "N",        # pep8-naming — catches camelCase functions
+  "PT",       # pytest style — fixtures, parametrize, raises
+  "ANN",      # require annotations on params and returns
+]
+ignore = [
+  "E501",    # line length is the formatter's job
+  "ANN101",  # no annotation needed on self
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Entrypoints and DAGs legitimately print at top level.
+"src/runners/*" = ["T20"]
+"pipelines/dags/*" = ["T20"]
+"tests/*" = ["ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
