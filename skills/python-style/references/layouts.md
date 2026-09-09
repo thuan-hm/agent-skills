@@ -25,7 +25,7 @@ project/
 ├── notebooks/                 # exploration only
 ├── scripts/                   # operational commands
 │
-├── pyproject.toml             # deps + tool config, single source of truth
+├── pyproject.toml             # deps + tool config
 ├── uv.lock
 ├── .python-version
 ├── .pre-commit-config.yaml
@@ -37,15 +37,13 @@ project/
 └── README.md
 ```
 
-`config/` (code that loads settings) and `environments/` (the values) are
-deliberately not near-homonyms — `config/` beside `configs/` is a naming trap in
-a tree people skim.
+`config/` holds the code that loads settings; `environments/` holds the values.
+Not `config/` beside `configs/` — one letter apart, different meanings.
 
 `errors` and `observability` start as modules. Three exception classes and a
-`configure_logging()` don't earn a package yet.
+`configure_logging()` don't earn a package.
 
-The tooling files are part of the layout. Without a lockfile, a pinned
-interpreter, and pre-commit hooks, a repo is tidy, not structured.
+The tooling files are part of the layout.
 
 ## Responsibilities
 
@@ -54,21 +52,19 @@ orchestration → pipelines → sources → transforms → loaders
 ```
 
 Nothing imports upward. A transform importing from `pipelines/`, or a source
-importing a loader, has inverted the arrow and will drag both sides along on the
-next change.
+importing a loader, has inverted the arrow.
 
 **`sources/`** — one module per external system. Owns auth, pagination, cursors,
 incremental extraction. No downstream business logic.
 
-**`transforms/`** — prefer plain functions; keep I/O out so they stay
-deterministic and trivial to test.
+**`transforms/`** — plain functions, no I/O, deterministic.
 
 **`loaders/`** — one module per destination. **Loaders own idempotency**: the
-orchestrator will retry, and only the loader can make a second write safe. Upsert
-on a natural key or replace the partition, never bare-append.
+orchestrator retries, and only the loader makes a second write safe. Upsert on a
+natural key or replace the partition, never bare-append.
 
-**`pipelines/`** — express *what the workflow does*, never *when it runs*.
-Dependencies arrive through `__init__` so tests can pass fakes:
+**`pipelines/`** — what the workflow does, never when it runs. Dependencies
+arrive through `__init__`:
 
 ```python
 class CustomerSync:
@@ -82,38 +78,38 @@ class CustomerSync:
 ```
 
 **`orchestration/`** — scheduling, retries, dependencies, run parameters. Flows
-are one-liners that call a pipeline. The test: switching orchestrators should
-require rewriting nothing under `src/`. Give each flow an
-`if __name__ == "__main__":` with an argument parser so it runs standalone.
+call a pipeline and nothing else. Switching orchestrators must not require
+rewriting anything under `src/`. Give each flow an `if __name__ == "__main__":`
+with an argument parser so it runs standalone.
 
 **`config/`** — one typed object from defaults, env vars, and files, validated at
-startup so a missing key fails immediately instead of three hours into a run.
-Secrets resolve at runtime from their identifier; never commit values.
+startup so a missing key fails immediately. Secrets resolve at runtime from their
+identifier.
 
 **`observability.py`** — configure logging once at the application boundary.
-Modules obtain a logger and emit events; they never configure globally.
+Modules obtain a logger; they never configure globally.
 
-**`errors.py`** — a hierarchy exists so callers can distinguish failures: retry
-`SourceError`, let `SchemaMismatchError` through. Lower layers raise; the
-orchestration layer decides retry, skip, or fail.
+**`errors.py`** — a hierarchy so callers can distinguish failures: retry
+`SourceError`, let `SchemaMismatchError` through. Lower layers raise;
+orchestration decides retry, skip, or fail.
 
 ## Choosing the axis
 
-Structure follows the main axis of change. When source-specific behaviour
-dominates, group by source (`sources/github/{extract,normalize,schema}.py`). When
-transformations are shared, group by stage (`sources/github.py` plus
-`transforms/customers.py`).
+Structure follows the main axis of change. Source-specific behaviour dominating
+means grouping by source — `sources/github/{extract,normalize,schema}.py`. Shared
+transformations mean grouping by stage — `sources/github.py` plus
+`transforms/customers.py`.
 
 The test:
 
 > When adding a source or changing a requirement, how many unrelated modules
 > need to change?
 
-**Split by stage only while the stages differ per source.** Once several stages
-are identical for everything — same normalization, same key derivation — a
+**Split by stage only while stages differ per source.** Once several stages are
+identical for everything — same normalization, same key derivation — a
 stage-per-package layout scatters one source across four packages and forces an
-edit in each to add a fifth. Then split by *question* instead, with shared work
-on the base:
+edit in each to add a fifth. Split by question instead, with shared work on the
+base:
 
 ```text
 ingestion/
@@ -128,53 +124,50 @@ ingestion/
 
 Either way, dispatch through a **registry** — a dict of name to implementation
 with a `get(name)` that raises on an unknown key. No `if`/`elif` on strings, no
-source name spelled outside it. Adding a source is then one class and one entry.
+source name spelled outside it. Adding a source is one class and one entry.
 
 ## Modules and classes
 
-Don't create a class to group a function. Use one when it holds meaningful
-state, configuration, lifecycle, or polymorphism — and prefer composition.
+Don't create a class to group a function. Use one for meaningful state,
+configuration, lifecycle, or polymorphism. Prefer composition.
 
-For a narrow interface with no shared implementation, `Protocol` is enough — no
-base class, no import from the implementations:
+`Protocol` for a narrow interface with no shared implementation — no base class,
+no import from the implementations:
 
 ```python
 class Source(Protocol):
     def fetch(self, watermark: str | None) -> list[dict]: ...
 ```
 
-Use an ABC when implementations genuinely share code or a lifecycle, and the
-base gives them something beyond a signature. Don't add a factory or plugin
-system until runtime substitution actually requires it.
+ABC when implementations share code or a lifecycle and the base gives them
+something beyond a signature. No factory or plugin system until runtime
+substitution requires it.
 
-Say what a package exports: an `__init__.py` with `__all__` listing the entry
-points. Without it every module is public by accident and these boundaries are
-suggestions.
+Declare `__all__` in `__init__.py`. Without it every module is public by accident.
 
 ## Utilities
 
-Avoid a generic `utils/`, `common/`, or `helpers/`. Reusable code gets a real
-owner — `storage/paths.py`, `serialization/json.py`, `infrastructure/retry.py`.
-A helper used by one domain stays with that domain.
+No generic `utils/`, `common/`, or `helpers/`. Reusable code gets a real owner —
+`storage/paths.py`, `serialization/json.py`, `infrastructure/retry.py`. A helper
+used by one domain stays with that domain.
 
-The failure mode is a name that stops excluding things: `utils/`, `core/`, and
+The failure mode is a name that stops excluding things. `utils/`, `core/`, and
 `document/` accept any file, so unrelated things accrete. If two files under a
-package aren't obviously about the thing it names, it's a junk drawer with a
-folder around it — put the modules at the package root and let each name work.
+package aren't obviously about the thing it names, put them at the package root
+and let each name work.
 
 ## Notebooks and tests
 
 Notebooks explore; stable logic moves into `src/`. Keep them out of the import
-path and excluded from lint and type checking. Production must never depend on
+path and excluded from lint and type checking. Production never depends on
 notebook execution.
 
-Tests mirror the boundaries that matter, with `conftest.py` for shared fixtures
-and `unit/` and `integration/` split by cost. Mark tests so CI runs the fast set
-on every push — the split only helps if something enforces it.
+Tests mirror the boundaries that matter: `conftest.py` for shared fixtures,
+`unit/` and `integration/` split by cost, marked so CI can run the fast set.
 
 ## Variants
 
-**ML / AI** — the boundary that matters is config ↔ logic ↔ I/O:
+**ML / AI** — the boundary is config ↔ logic ↔ I/O:
 
 ```text
 src/<package>/
@@ -185,8 +178,7 @@ src/<package>/
 configs/        # one YAML per experiment variant
 ```
 
-No hyperparameter in code. An experiment is a config file plus a commit, so a
-run is reproducible from those two facts alone.
+No hyperparameter in code. An experiment is a config file plus a commit.
 
 **Backend service** — routers stay thin:
 
@@ -200,12 +192,12 @@ backend/core/   # settings, logging, dependencies
 backend/main.py # app assembly only
 ```
 
-A router reaching past its service into the ORM is the first crack — once HTTP
-concerns and query logic mix, neither can be tested alone.
+A router reaching past its service into the ORM mixes HTTP concerns with query
+logic, and neither can then be tested alone.
 
 ## Start smaller
 
-Don't begin with the full tree. A small ingestion job needs:
+A small ingestion job needs:
 
 ```text
 src/project/{source,transform,load}.py
@@ -215,5 +207,5 @@ README.md
 ```
 
 Add packages when responsibilities and change boundaries become clear. The goal
-isn't more directories — it's making responsibilities, dependencies, and change
-boundaries obvious.
+is making responsibilities, dependencies, and change boundaries obvious — not
+more directories.

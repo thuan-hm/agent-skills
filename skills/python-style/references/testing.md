@@ -4,12 +4,12 @@
 
 ## Naming and shape
 
-Name tests `test_<what>_<condition>_<expected>`, so a failure in CI output reads
-as a sentence and you know what broke without opening the file.
+Name tests `test_<what>_<condition>_<expected>` so a CI failure line names what
+broke.
 
-Fixtures over setup methods. `@pytest.mark.parametrize` for variations of the
-same assertion. `tmp_path` for anything touching the filesystem — never a
-hardcoded temp dir, never the repo tree.
+Fixtures over setup methods. `@pytest.mark.parametrize` for variations of one
+assertion. `tmp_path` for anything touching the filesystem — never a hardcoded
+temp dir, never the repo tree.
 
 ## Mark by cost
 
@@ -25,18 +25,16 @@ markers = [
 ]
 ```
 
-Declaring markers silences `PytestUnknownMarkWarning` and makes the vocabulary
-explicit. CI then runs `-m unit` on every push and the full suite on merge.
+Declaring markers silences `PytestUnknownMarkWarning`. CI runs `-m unit` on every
+push, the full suite on merge.
 
 `pytest-xdist` for parallelism, `pytest-cov` for coverage.
 
 ## Record HTTP, don't call it
 
-Test against recorded responses with `pytest-recording`/VCR: record once, replay
-after. The suite becomes fast, offline, and deterministic, and it stops being a
-way to burn API quota.
+`pytest-recording`/VCR: record once, replay after.
 
-**Configure filtering before the first recording.** A cassette is a committed
+Configure filtering **before** the first recording — a cassette is a committed
 file, so an unmasked one is a leaked credential:
 
 ```python
@@ -50,26 +48,24 @@ VCR_FILTER_POST_DATA_PARAMETERS = [
 ]
 ```
 
-Re-record deliberately, and read the diff before committing it.
+Re-record deliberately. Read the diff before committing it.
 
-## Never assert a duplicate class name
+## Never duplicate a test class name
 
-Two `class TestFoo:` in one module is not an error — the second silently rebinds
-the first, and every test in the first vanishes from the run. It looks like a
-pass. This happened once for 11 tests, caught only by comparing `grep -c "def
-test"` against the collected count:
+Two `class TestFoo:` in one module is not an error — the second rebinds the
+first, and every test in the first vanishes from the run. It looks like a pass.
+Compare test functions against collected count:
 
 ```bash
 diff <(grep -c "def test" tests/unit/test_x.py) <(pytest tests/unit/test_x.py --collect-only -q | tail -1)
 ```
 
-Read the collected count after adding tests. A suite that stays green while
-shrinking is worse than a red one.
+Read the collected count after adding tests.
 
 ## Prove a negative with a failing stub
 
-To assert something is *not* called, make the stub fail rather than counting
-calls. The assertion lives at the place that would be wrong:
+To assert something is not called, make the stub fail. The assertion sits where
+the wrong behaviour would happen:
 
 ```python
 monkeypatch.setattr(
@@ -80,8 +76,6 @@ monkeypatch.setattr(
 
 ## Assert the public surface
 
-Encapsulation decays silently — one convenient re-export at a time. Pin it:
-
 ```python
 def test_the_package_exports_only_its_entry_points():
     assert sorted(mypkg.__all__) == ["Config", "Pipeline"]
@@ -91,9 +85,13 @@ def test_internals_are_not_reachable_from_the_package_root():
     assert not hasattr(mypkg, "column_filter")
 ```
 
-Cheap, and it turns "we agreed not to export that" into a failing test.
+Turns an agreement not to export something into a failing test.
 
-## Two cheap tests worth having anywhere
+## Two cheap tests for any repo
 
-- **Import test** — import every module in the package. Catches a broken import or a circular dependency before deploy, and costs one file.
-- **Version compatibility test** — when a framework is pinned to a narrow range, assert the installed version falls inside it. The pin and the assumption then fail together, loudly, instead of drifting apart.
+**Import test** — import every module in the package. Catches a broken import or
+circular dependency before deploy.
+
+**Version compatibility test** — when a framework is pinned to a narrow range,
+assert the installed version falls inside it, so the pin and the assumption fail
+together.

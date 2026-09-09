@@ -5,13 +5,13 @@ description: House Python conventions — naming, imports, typing, class design,
 
 # Python style
 
-Conventions that tooling can't enforce. Spacing, import order, quote style, and
-line length are `ruff`'s job.
+Conventions tooling can't enforce. Spacing, import order, quote style, and line
+length are `ruff`'s job.
 
-- Project layout — boundaries, dependency direction, choosing the axis: [references/layouts.md](references/layouts.md)
-- Repo setup — ruff, pre-commit, pinning, mypy: [references/tooling.md](references/tooling.md)
+- Layout: [references/layouts.md](references/layouts.md)
+- Repo setup: [references/tooling.md](references/tooling.md)
 - Testing: [references/testing.md](references/testing.md)
-- Drop-in config: [references/pyproject-template.toml](references/pyproject-template.toml)
+- Config template: [references/pyproject-template.toml](references/pyproject-template.toml)
 
 ## Naming
 
@@ -23,13 +23,12 @@ line length are `ruff`'s job.
 | internal attr / method | `_leading` | `self._client`, `_build_query()` |
 | subclass-collision guard | `__leading` | `self.__buffer` |
 
-Acronyms follow the surrounding name: `http_client.py`, `api_io.py` — never
-`httpClient.py`.
+Acronyms follow the surrounding name: `http_client.py`, `api_io.py`.
 
-`_single` is the default for internals. `__double` mangles (`__buffer` inside
-`Loader` → `_Loader__buffer`), so a subclass gets a *different* attribute instead
-of overriding and tests must spell the mangled name — use it only to protect base
-state, with a comment saying why.
+`_single` is the default for internals. `__double` mangles — `__buffer` in
+`Loader` becomes `_Loader__buffer`, so a subclass gets a different attribute
+instead of overriding. Use it only to protect base-class state, with a comment
+saying why.
 
 Names carry units and intent: `max_requests_per_run`, `fetched_at`,
 `timeout_seconds`.
@@ -38,21 +37,20 @@ Names carry units and intent: `max_requests_per_run`, `fetched_at`,
 
 Absolute from the package root: `from mypkg.lib.config import Config`.
 
-No side effects at import time — no connections, file reads, or network calls, so
-tests can import without a live environment.
+No side effects at import time — no connections, file reads, or network calls.
 
 ## Typing
 
-Annotate every parameter and return. Builtin generics only — `list[dict]`,
+Annotate every parameter and return. Builtin generics only: `list[dict]`,
 `X | None`. Never `List`, `Dict`, `Optional`, `Union`. If the default is `None`,
-say so: `list[str] | None = None`.
+annotate it: `list[str] | None = None`.
 
 ## Classes and functions
 
-Abstract on the **second** implementation, not the first.
+Abstract on the second implementation, not the first.
 
 **Pydantic for structured data** — boundaries and most internal structs.
-`@dataclass` only when validation is unwanted. On v2: `@field_validator`,
+`@dataclass` only when validation is unwanted. On v2 use `@field_validator` and
 `@model_validator`; `@validator` and `@root_validator` are deprecated. Validate
 with a model, never a wall of `isinstance` checks.
 
@@ -66,23 +64,21 @@ def sync_source(
 ) -> None:
 ```
 
-Class hierarchies are for when several methods vary together and share state.
+Use a class hierarchy when several methods vary together and share state.
 
-**The base owns the shared work; a child declares what it *is*.** Ordering,
-joins, key derivation, normalization go on the base; a child supplies field
-values and overrides only what varies, usually I/O. Shared logic outside the
-hierarchy means adding an implementation edits that outside code too.
+**The base owns shared work; a child declares what it is.** Ordering, joins, key
+derivation, and normalization go on the base. A child supplies field values and
+overrides only what varies, usually I/O.
 
-**Child class over configured instance** once differences are declarative.
-`LegacySource(name="legacy", numeric_ids=True, …)` buries facts in an argument
-list; typed field defaults on a subclass are greppable and checkable.
+**Child class over configured instance** once differences are declarative. Typed
+field defaults on a subclass are greppable and checkable; a long argument list
+is not.
 
-**Wrong base if the candidate inherits fields it must leave empty and overrides
-every method.** Hang it one level up. Sharing a *contract* is not being a
-subtype.
+**Wrong base if the candidate inherits fields it leaves empty and overrides every
+method.** Hang it one level up. Sharing a contract is not being a subtype.
 
-**A fixed order of operations deserves its own class** — the sequence is the part
-most easily got wrong, and stated once it can be read in one place.
+**A fixed order of operations gets its own class** — stated once, read in one
+place.
 
 **Collaborators in `__init__` with production defaults**, so tests pass stubs
 instead of patching globals:
@@ -93,47 +89,43 @@ def __init__(self, reconciler: Reconciler | None = None, store: Store | None = N
     self._store = store or Store()
 ```
 
-Set every attribute in `__init__`; skip an `__init__` that only calls `pass`.
-`@property` for derived values, `@cached_property` when expensive and inputs are
-fixed, `@staticmethod` for stateless helpers, `@classmethod` for alternative
+Set every attribute in `__init__`. Skip an `__init__` that only calls `pass`.
+`@property` for derived values, `@cached_property` when expensive with fixed
+inputs, `@staticmethod` for stateless helpers, `@classmethod` for alternative
 constructors.
 
 ## Encapsulation
 
-**Budget the public surface and measure it.** One package exported 114 public
-names against the 12 its only caller used — the other 102 were internals a future
-caller could reach for. Past ~2× means the internals have leaked.
+**Export what callers need, nothing more.** Count exported names against the
+names consumers import; a large gap means internals leaked.
 
-**Format knowledge lives in the object that owns the format.** Grep a magic
-string — CSV column, payload key — and it should appear in exactly one module.
+**Format knowledge lives in the object that owns the format.** Grep any magic
+string — CSV column, payload key, layout quirk — and it appears in one module.
 
-**Public is what a thing *is*; private is what it *does*.** Declared config
-(precedence, paths, dtypes, flags a subclass sets) is data about the object and
-is public. The mechanics consuming it — validating, coercing, ordering, building
-the query — are not.
+**Public is what a thing is; private is what it does.** Declared configuration —
+precedence, paths, dtypes, flags a subclass sets — is public. The mechanics that
+consume it — validating, coercing, ordering, query building — are not.
 
 **One entry point per concern.** `source.curate(path, filters)`, not five
-exported functions the caller must sequence. If callers sequence your internals,
-that sequence is the abstraction you failed to write.
+exported functions the caller sequences. A sequence callers must reproduce is a
+missing abstraction.
 
-**Don't re-export a subpackage flat.** An `__init__` importing 25 names from four
-modules published four modules, not one package.
+**Don't re-export a subpackage flat.** An `__init__` importing every name from
+four modules published four modules, not one package.
 
-**Group loose constants into a named class** — `DocumentRow.ALL`. Four constants
-that always travel together are an unnamed object.
+**Group loose constants into a named class**: `DocumentRow.ALL`. Constants that
+travel together are an unnamed object.
 
 **Declare `__all__` and assert it in a test** ([references/testing.md](references/testing.md)).
-Convention alone doesn't hold against the next `from x import *`.
 
 ## Language traps
 
-No linter catches these.
+**Pydantic v2 treats leading-underscore attributes as private attrs, not
+fields.** `_numeric_ids: bool = False` can't be set through the constructor and
+`Model(_numeric_ids=True)` raises. Declared config must be public-named; use
+`PrivateAttr` for genuine internal state.
 
-**Pydantic v2 makes leading-underscore attributes private attrs, not fields.**
-`_numeric_ids: bool = False` is unsettable and `Model(_numeric_ids=True)` raises.
-Declared config must be public-named; `PrivateAttr` only for genuine internals.
-
-**A comprehension in a class body can't see class variables** — only the first
+**A comprehension in a class body can't see class variables.** Only the outermost
 iterable is evaluated in class scope:
 
 ```python
@@ -144,32 +136,29 @@ class Row:
 
 Compute at module level, expose through the class.
 
-**On a frozen dataclass, an unannotated attribute is a constant, not a field.**
-`UNDATED = "undated"` is class-level; `undated: str = "x"` joins `__init__` and
-`__eq__`.
+**On a dataclass, an unannotated class attribute is not a field.**
+`UNDATED = "undated"` is a plain class attribute; `undated: str = "x"` joins
+`__init__`, `__eq__`, and `repr`.
 
-**`pandas.read_parquet(columns=[...])` drops a missing column silently** — a
-renamed upstream field looks identical to every row being empty. General rule:
-when a library's "not found" is indistinguishable from "empty", assert presence
-yourself.
+**When a library's "not found" is indistinguishable from "empty", assert presence
+yourself.** A narrowing read selecting a column subset can yield nothing rather
+than raise when a field is renamed upstream. Check expected columns before
+trusting the result.
 
 ## Config and constants
 
 No credentials, magic numbers, or query strings inside a class. Limits, delays,
-page sizes, model names, and paths are config — a cap buried in a constructor
-truncates results with nothing in its name to warn you.
+page sizes, model names, and paths are config.
 
-One typed object from defaults, env vars, and `.env` via `pydantic.BaseSettings`;
-commit `.env.example` with every key. `Enum` for a fixed set of choices — bare
-strings can't be checked exhaustively.
+One typed object from defaults, env vars, and `.env` via `pydantic.BaseSettings`.
+Commit `.env.example` with every key. `Enum` for a fixed set of choices.
 
 **Secrets by name, never by value.** Keep the identifier — env var, vault path,
-secret name — and resolve at runtime.
+secret name — in code; resolve the value at runtime.
 
 ## Errors
 
-**Catch narrow, log with `exc_info=True`, re-raise.** The dangerous failure
-returns a plausible value:
+**Catch narrow, log with `exc_info=True`, re-raise.**
 
 ```python
 # no — an outage and "no matches" are now indistinguishable
@@ -178,8 +167,9 @@ except Exception as e:
     return []
 ```
 
-An empty list means "nothing matched". If the call never ran, let it propagate. A
-context manager that swallows a failure and yields `None` is the same bug.
+An empty list means "nothing matched". If the call never ran, let it propagate.
+A context manager that swallows a connection failure and yields `None` is the
+same bug.
 
 **Batch work accumulates, then raises:**
 
@@ -196,68 +186,63 @@ if error_count:
     raise BatchError(f"{error_count} of {len(items)} items failed")
 ```
 
-The final `raise` is the point — without it this is swallowing.
+Without the final `raise` this is swallowing.
 
-Retry transient failures only, capped exponential backoff. Never retry a client
-error.
+Retry transient failures only, with capped exponential backoff. Never retry a
+client error.
 
 ## Logging
 
-`logging`, never `print` — different destinations once something else runs the
-process, and no level filtering. Use a framework's run-scoped logger where there
-is one.
+`logging`, never `print`. Use a framework's run-scoped logger where there is one.
 
-Log at boundaries (start, end, failure, state advance), not in loops. Log
-traceable identifiers: source, run id, counts. Never secrets or personal data.
+Log at boundaries — start, end, failure, state advance — not inside loops. Log
+source, run id, and counts. Never log secrets, tokens, or personal data.
 
 ## Comments and docstrings
 
-Google style, and the docstring must be the **first statement inside** the
-function or class — a string above `class` or `def` is discarded, invisible to
-`help()` and IDEs. `Args:` and `Returns:` when non-obvious, `Raises:` whenever
-the caller must handle it.
+Google style. The docstring is the **first statement inside** the function or
+class; a string above `class` or `def` is discarded and invisible to `help()`.
+`Args:` and `Returns:` when non-obvious, `Raises:` whenever the caller must
+handle a failure.
 
-Greppable tags: `# INFO:` (context needed to not break this), `# NOTE:` (a
-surprising deliberate choice), `# TODO:` (actionable gap).
+Greppable tags: `# INFO:` context needed to not break this, `# NOTE:` a
+surprising deliberate choice, `# TODO:` an actionable gap.
 
-Comments explain *why*. `# init`, `# set path` are noise. Section separators at
-one width per repo; needing many means the module should split.
+Comments explain why. `# init`, `# set path` are noise. Section separators at one
+width per repo.
 
 ## State and reprocessing
 
-Rerunnable work must be idempotent — upsert on a natural key or replace the
+Rerunnable work must be idempotent: upsert on a natural key or replace the
 partition, never bare-append. Persist progress markers outside the process,
-advance only after the write succeeds, and stamp records with extraction and load
-timestamps.
+advance them only after the write succeeds, and stamp records with extraction and
+load timestamps.
 
-**Give partial updates their own write path.** A pipeline whose only write is a
-full replacement forces a total re-run to fix one column, discarding every
-derived artifact. Add the narrow `ON CONFLICT DO UPDATE` over just the changing
-columns, and skip rows that don't exist rather than inserting stubs — a stub
-answers "this table needs rebuilding" with a broken row.
+**Give partial updates their own write path.** When the only write is a full
+replacement, fixing one column costs a total re-run and discards derived
+artifacts. Add a narrow `ON CONFLICT DO UPDATE` over the changing columns, and
+skip rows that don't exist rather than inserting stubs.
 
-**Separate regenerable from irreplaceable data, in code.** Before writing a
-rebuild flow, ask which output columns a machine can reproduce. Anything a human
-typed is carried forward on a stable key, and the flow **refuses** rather than
-emitting blanks — blank review marks read as "nothing selected", not as data
-loss. One sheet held 66,239 hand-entered marks; a naive regenerate would have
-destroyed all of them silently.
+**Separate regenerable data from irreplaceable data, in code.** Before writing a
+rebuild path, identify which output columns a machine can reproduce. Carry
+human-entered values forward on a stable key, and **refuse** rather than emit
+blanks when they can't be found — a blank reads as "nothing was set", so the loss
+is silent.
 
-**Validate a key on the whole domain, not the current slice.** A field unique in
-today's filtered scope may not be unique at large — one document number named 84
-unrelated records once the filter widened. Measure distinctness on the full
-dataset, and never add a `UNIQUE` constraint that only holds because of a `WHERE`
-clause elsewhere.
+**Validate a key against the whole domain, not the current slice.** A field
+unique in a filtered scope may collide once the filter widens. Measure
+distinctness on the full dataset, and never add a `UNIQUE` constraint that holds
+only because of a `WHERE` clause elsewhere.
 
 ## Files
 
-`pathlib.Path` over `os.path` — `Path("data") / name`, `path.read_text()`.
+`pathlib.Path` over `os.path`: `Path("data") / name`, `path.read_text()`.
 
 ## Tests
 
 `pytest` only. Name `test_<what>_<condition>_<expected>`, mark by cost, record
-HTTP rather than calling live APIs — mask credentials before the first recording,
-since cassettes are committed. See [references/testing.md](references/testing.md).
+HTTP instead of calling live APIs, mask credentials before the first recording.
+See [references/testing.md](references/testing.md).
 
 ## Before committing
 
@@ -270,4 +255,4 @@ since cassettes are committed. See [references/testing.md](references/testing.md
 - Nothing public that an outside caller doesn't need
 - No external format's field names visible outside the class that reads it
 - Collaborators injectable, so no test patches a module global
-- Test count went **up** — read the number, not just the colour
+- Test count went up — read the number, not just the colour
