@@ -52,6 +52,47 @@ VCR_FILTER_POST_DATA_PARAMETERS = [
 
 Re-record deliberately, and read the diff before committing it.
 
+## Never assert a duplicate class name
+
+Two `class TestFoo:` in one module is not an error — the second silently rebinds
+the first, and every test in the first vanishes from the run. It looks like a
+pass. This happened once for 11 tests, caught only by comparing `grep -c "def
+test"` against the collected count:
+
+```bash
+diff <(grep -c "def test" tests/unit/test_x.py) <(pytest tests/unit/test_x.py --collect-only -q | tail -1)
+```
+
+Read the collected count after adding tests. A suite that stays green while
+shrinking is worse than a red one.
+
+## Prove a negative with a failing stub
+
+To assert something is *not* called, make the stub fail rather than counting
+calls. The assertion lives at the place that would be wrong:
+
+```python
+monkeypatch.setattr(
+    type(source), "fetch_content",
+    lambda self, ids: pytest.fail("a lifecycle refresh must not fetch content"),
+)
+```
+
+## Assert the public surface
+
+Encapsulation decays silently — one convenient re-export at a time. Pin it:
+
+```python
+def test_the_package_exports_only_its_entry_points():
+    assert sorted(mypkg.__all__) == ["Config", "Pipeline"]
+
+def test_internals_are_not_reachable_from_the_package_root():
+    assert not hasattr(mypkg, "SELECT_COLUMN")
+    assert not hasattr(mypkg, "column_filter")
+```
+
+Cheap, and it turns "we agreed not to export that" into a failing test.
+
 ## Two cheap tests worth having anywhere
 
 - **Import test** — import every module in the package. Catches a broken import or a circular dependency before deploy, and costs one file.
