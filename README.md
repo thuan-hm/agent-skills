@@ -4,18 +4,16 @@ My personal Claude Code skills — data, AI, backend, and whatever else earns on
 
 ## Install
 
-```
-/plugin marketplace add thuan-hm/agent-skills
-```
-
-```
-/plugin install agent-skills@agent-skills
+```bash
+git clone git@github.com:thuan-hm/agent-skills.git ~/Projects/agent-skills
+~/Projects/agent-skills/install.sh
 ```
 
-Send the two commands as separate prompts. The plugin depends on
-`mattpocock-skills` (third-party: grilling, TDD, code review…), which installs
-with it — pinned to a reviewed commit in `marketplace.json`; bump the `sha` to
-take updates.
+The script symlinks every `skills/<name>` into `~/.claude/skills`, and clones
+pinned third-party skills (listed in `VENDORED` at the top of the script) into
+`~/.claude/vendor`, linking them the same way. Re-run it after `git pull` to
+pick up new skills; bump a `sha` there to take upstream updates. Restart Claude
+Code afterwards.
 
 ## Skills
 
@@ -23,16 +21,14 @@ take updates.
 | --- | --- | --- |
 | [python-style](skills/python-style/SKILL.md) | python | structure and review Python for data, AI, and backend work |
 
-Skills stay flat in `skills/`, one directory each, regardless of domain — the
-plugin loader looks for `skills/<name>/SKILL.md`, so grouping happens in this
-table, not in subfolders.
+Skills stay flat in `skills/`, one directory each, regardless of domain — Claude Code
+only finds `~/.claude/skills/<name>/SKILL.md` one level deep, so grouping
+happens in this table, not in subfolders.
 
 ## Layout
 
 ```text
-.claude-plugin/
-  marketplace.json   # what /plugin marketplace add reads; the plugin is "./"
-  plugin.json        # name, version, description
+install.sh           # links skills/ and pinned third-party skills into ~/.claude/skills
 skills/<name>/
   SKILL.md           # frontmatter: name + description only
   references/        # detail SKILL.md points at, loaded on demand
