@@ -9,9 +9,20 @@
   "plugins": [
     {
       "name": "agent-skills",
-      "description": "Skills across data, AI, and backend work — and for writing skills themselves.",
+      "description": "Skills across data, AI, and backend work.",
       "source": "./",
       "category": "productivity"
+    },
+    {
+      "name": "mattpocock-skills",
+      "description": "Matt Pocock's agent skills — grilling, spec/ticket flows, TDD, code review, domain modelling.",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/mattpocock/skills.git",
+        "sha": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7"
+      },
+      "homepage": "https://github.com/mattpocock/skills",
+      "category": "development"
     }
   ]
 }
