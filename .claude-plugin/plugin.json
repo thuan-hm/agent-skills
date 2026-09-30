@@ -1,7 +1,7 @@
 {
   "name": "agent-skills",
   "version": "0.1.0",
-  "description": "Personal skills across data, AI, and backend work — and for writing skills themselves.",
+  "description": "Personal skills across data, AI, and backend work.",
   "author": {
     "name": "thuan-hm",
     "url": "https://github.com/thuan-hm"
@@ -12,5 +12,8 @@
     "ai",
     "backend",
     "skills"
+  ],
+  "dependencies": [
+    "mattpocock-skills"
   ]
 }

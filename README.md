@@ -12,13 +12,10 @@ My personal Claude Code skills — data, AI, backend, and whatever else earns on
 /plugin install agent-skills@agent-skills
 ```
 
-```
-/plugin install mattpocock-skills@agent-skills
-```
-
-Send each command as a separate prompt. `mattpocock-skills` is third-party
-(grilling, TDD, code review…), listed here pinned to a reviewed commit so one
-marketplace sets up a new machine; bump the `sha` to take updates.
+Send the two commands as separate prompts. The plugin depends on
+`mattpocock-skills` (third-party: grilling, TDD, code review…), which installs
+with it — pinned to a reviewed commit in `marketplace.json`; bump the `sha` to
+take updates.
 
 ## Skills
 
