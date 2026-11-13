@@ -10,7 +10,7 @@ git clone git@github.com:thuan-hm/agent-skills.git ~/Projects/agent-skills
 ```
 
 The script symlinks every `skills/<name>` into `~/.claude/skills`, and clones
-pinned third-party skills (listed in `VENDORED` at the top of the script) into
+pinned third-party skills (listed in `skills.yaml`) into
 `~/.claude/vendor`, linking them the same way. Re-run it after `git pull` to
 pick up new skills; bump a `sha` there to take upstream updates. Restart Claude
 Code afterwards.
